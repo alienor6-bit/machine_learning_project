@@ -1,3 +1,6 @@
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+import numpy as np
+
 def clean_indicators(indicators_dict):
     cleaned_indicators = {}
 
