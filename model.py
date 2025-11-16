@@ -1,83 +1,77 @@
 """
-LSTM model architecture for classification
-(Final attempt: Simplified, heavily regularized)
+LSTM model architecture for regression
 """
 
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import (
-    LSTM, Dense, Dropout, BatchNormalization, 
-    Reshape, Softmax
-)
+from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.regularizers import l2 # <-- IMPORT L2 REGULARIZER
+from tensorflow.keras.regularizers import l2
+import tensorflow as tf # Importé pour la métrique MAE
 
 
-def build_classifier(input_shape, n_horizons, units=64, dropout=0.5): 
+def build_regressor(input_shape, n_horizons, units=64, dropout=0.4):
     """
-    Build a simplified, heavily regularized LSTM classifier
+    Build LSTM regressor for multi-horizon prediction
     """
-    print("\nBuilding SIMPLIFIED and REGULARIZED LSTM classifier...")
+    print("\nBuilding LSTM Regressor...")
     print(f"  Input shape: {input_shape}")
     print(f"  LSTM units: {units}")
     print(f"  Dropout: {dropout}")
-    print(f"  L2 Regularization: 0.001")
 
-    # L2 value (la "taxe" sur les poids)
     l2_reg = 0.001
 
     model = Sequential([
-        # First LSTM layer with L2 reg
+        # Input layer
         LSTM(
             units, 
             return_sequences=True, 
             input_shape=input_shape,
-            kernel_regularizer=l2(l2_reg) # <-- ADD L2
+            kernel_regularizer=l2(l2_reg)
         ),
         Dropout(dropout),
         BatchNormalization(),
         
-        # --- MODEL SIMPLIFIED: Removed one LSTM layer ---
-        
-        # Final LSTM layer
+        # Hidden layer
         LSTM(
             units // 2,
-            kernel_regularizer=l2(l2_reg) # <-- ADD L2
+            kernel_regularizer=l2(l2_reg)
         ),
         Dropout(dropout),
         
-        # Dense layers
-        Dense(32, activation='relu', kernel_regularizer=l2(l2_reg)), # <-- ADD L2
+        # Dense layer
+        Dense(32, activation='relu', kernel_regularizer=l2(l2_reg)),
         Dropout(dropout),
         
-        # Output layer
-        Dense(n_horizons * 3),
-        Reshape((n_horizons, 3)),
-        Softmax(axis=-1)
+        # --- CRITICAL CHANGE: Output layer ---
+        # No Reshape, No Softmax
+        # Just one 'linear' output node per horizon
+        Dense(n_horizons, activation='linear')
     ])
     
     return model
 
 
-def compile_model(model, learning_rate=0.0001): # <-- Keep low learning rate
+def compile_model(model, learning_rate=0.0001):
     """
-    Compile model with optimizer and loss
+    Compile model with optimizer and loss for regression
     """
     optimizer = Adam(learning_rate=learning_rate)
     
     model.compile(
         optimizer=optimizer,
-        loss='sparse_categorical_crossentropy',
-        metrics=['accuracy']
+        loss='mean_squared_error', # <-- MSE for regression
+        metrics=[tf.keras.metrics.MeanAbsoluteError(name='mae')] # <-- MAE is more interpretable
     )
     
-    print(f"\nModel compiled with learning rate: {learning_rate}")
+    print(f"\nModel compiled with loss=MSE, metric=MAE, lr={learning_rate}")
     return model
 
 
 def get_callbacks(patience=20, min_delta=0.0001):
     """
     Get training callbacks
+    (monitoring val_loss, which is val_mse)
     """
     callbacks = [
         EarlyStopping(
@@ -97,10 +91,3 @@ def get_callbacks(patience=20, min_delta=0.0001):
     ]
     
     return callbacks
-
-
-if __name__ == "__main__":
-    # Test model creation
-    model = build_classifier(input_shape=(60, 20), n_horizons=4)
-    model = compile_model(model)
-    model.summary()

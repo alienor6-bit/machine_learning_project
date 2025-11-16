@@ -20,15 +20,14 @@ def create_sequences(data, horizons, window_size=60):
     
     X, y = [], []
     
-    # Note: range stops at len(data)
     for i in range(window_size, len(data)):
         X.append(features[i-window_size:i])
-        y.append(targets[i]) # Target is at step 'i'
+        y.append(targets[i])
     
     X = np.array(X)
     y = np.array(y)
     
-    print(f"  X shape: {X.shape}") # (samples, window_size, n_features)
+    print(f"  X shape: {X.shape}")
     print(f"  y shape: {y.shape}") # (samples, n_horizons)
     
     return X, y, feature_cols, target_cols
@@ -39,8 +38,6 @@ def split_temporal(X, y, test_size=0.2, val_size=0.1):
     Split data temporally (no shuffling)
     """
     n = len(X)
-    
-    # Calculate split indices
     test_idx = int(n * (1 - test_size))
     val_idx = int(test_idx * (1 - val_size))
     
@@ -58,28 +55,39 @@ def split_temporal(X, y, test_size=0.2, val_size=0.1):
 
 def normalize_features(X_train, X_val, X_test):
     """
-    Normalize feature sequences using MinMaxScaler
-    Fit only on training data
+    Normalize feature sequences (X) using MinMaxScaler
     """
-    print("\nNormalizing features...")
+    print("\nNormalizing features (X)...")
     
     n_samples, n_timesteps, n_features = X_train.shape
-    
-    # Reshape to 2D for scaling: (samples * timesteps, features)
     X_train_2d = X_train.reshape(-1, n_features)
     
     scaler = MinMaxScaler()
-    scaler.fit(X_train_2d) # Fit ONLY on training data
+    scaler.fit(X_train_2d)
     
-    # Transform all splits
     X_train_norm = scaler.transform(X_train_2d).reshape(X_train.shape)
     X_val_norm = scaler.transform(X_val.reshape(-1, n_features)).reshape(X_val.shape)
     X_test_norm = scaler.transform(X_test.reshape(-1, n_features)).reshape(X_test.shape)
     
     print("Features normalized")
-    
     return X_train_norm, X_val_norm, X_test_norm, scaler
 
 
-if __name__ == "__main__":
-    print("Preprocessing module - Use with main.py")
+def normalize_targets(y_train, y_val, y_test):
+    """
+    Normalize target values (y) using MinMaxScaler
+    Fit only on training data
+    """
+    print("\nNormalizing targets (y)...")
+    
+    # y_train shape is (samples, n_horizons)
+    scaler = MinMaxScaler()
+    scaler.fit(y_train) # Fit on training targets
+    
+    # Transform all splits
+    y_train_norm = scaler.transform(y_train)
+    y_val_norm = scaler.transform(y_val)
+    y_test_norm = scaler.transform(y_test)
+    
+    print("Targets normalized")
+    return y_train_norm, y_val_norm, y_test_norm, scaler

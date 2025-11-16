@@ -1,26 +1,23 @@
 """
-Main script for Bitcoin price prediction
+Main script for Bitcoin VOLUME prediction (Regression)
 """
 
 import os
 from datetime import datetime
 import pickle
-import numpy as np
-# Pas besoin de class_weight ici
-# from sklearn.utils import class_weight 
 
 from data_loader import prepare_dataset
-from preprocessing import create_sequences, split_temporal, normalize_features
-from model import build_classifier, compile_model, get_callbacks
+from preprocessing import (create_sequences, split_temporal, normalize_features, normalize_targets)
+from model import (build_regressor, compile_model, get_callbacks )
 from train import train_model, display_training_results
-from evaluate import predict_and_evaluate, show_sample_predictions, analyze_by_confidence
-
+from evaluate import (predict_and_evaluate, show_sample_predictions )
+import tensorflow as tf
 
 def main():
     """Main execution pipeline"""
-    
+    tf.keras.utils.set_random_seed(42)
     print("="*60)
-    print("BITCOIN PRICE PREDICTION - CLASSIFICATION")
+    print("BITCOIN VOLUME PREDICTION - REGRESSION")
     print("="*60)
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -36,8 +33,7 @@ def main():
     # Step 1: Prepare data
     dataset, horizons = prepare_dataset(
         start_date='2018-01-01',
-        horizons=HORIZONS,
-        percentile=40 # <-- Vérifie que c'est bien 40 (ou 30)
+        horizons=HORIZONS
     )
     
     # Step 2: Create sequences
@@ -54,58 +50,68 @@ def main():
         val_size=VAL_SIZE
     )
     
-    # Step 4: Normalize
-    X_train_norm, X_val_norm, X_test_norm, scaler = normalize_features(
+    # Step 4: Normalize Features (X)
+    X_train_norm, X_val_norm, X_test_norm, feature_scaler = normalize_features(
         X_train, X_val, X_test
     )
     
+    # --- NEW Step 4.5: Normalize Targets (y) ---
+    y_train_norm, y_val_norm, y_test_norm, target_scaler = normalize_targets(
+        y_train, y_val, y_test
+    )
+    
     # Step 5: Build model
-    model = build_classifier(
+    model = build_regressor(
         input_shape=(X_train_norm.shape[1], X_train_norm.shape[2]),
         n_horizons=len(horizons),
         units=64,
-        dropout=0.3
+        dropout=0.4
     )
-    model = compile_model(model, learning_rate=0.001)
+    model = compile_model(model, learning_rate=0.0001)
     model.summary()
     
-    # --- Il n'y a PAS de calcul de sample_weight ici ---
-
     # Step 6: Train
-    print("\nStep 6: Training...")
     callbacks = get_callbacks(patience=20)
-    
-    # --- APPEL CORRECT ---
-    # On passe X_val_norm et y_val séparément
     history = train_model(
         model,
-        X_train_norm, y_train,
-        X_val_norm, y_val, # <-- C'est ici
+        X_train_norm, y_train_norm, # Pass normalized data
+        X_val_norm, y_val_norm,     # Pass normalized data
         epochs=EPOCHS,
         batch_size=BATCH_SIZE,
         callbacks=callbacks
-        # Pas de class_weight ou sample_weight
     )
     display_training_results(history)
     
     # Step 7: Evaluate
-    results = predict_and_evaluate(model, X_test_norm, y_test, horizons)
+    results = predict_and_evaluate(
+        model, 
+        X_test_norm, y_test_norm, # Pass normalized test data
+        horizons, 
+        target_scaler # <-- Pass the scaler for inverse transform
+    )
     
-    # Step 8: Analyze
+    # Step 8: Show predictions
     show_sample_predictions(results, horizons, n_samples=10)
-    analyze_by_confidence(results, horizons)
     
-    # Step 9: Save model
-    save_dir = f"saved_models/bitcoin_{timestamp}"
+    # Step 9: Save model and scalers
+    print("\nStep 9: Saving model...")
+    save_dir = f"saved_models/volume_regressor_{timestamp}"
     os.makedirs(save_dir, exist_ok=True)
     
     model.save(f"{save_dir}/model.keras")
     
-    with open(f"{save_dir}/scaler.pkl", 'wb') as f:
-        pickle.dump(scaler, f)
+    # Save feature scaler
+    with open(f"{save_dir}/feature_scaler.pkl", 'wb') as f:
+        pickle.dump(feature_scaler, f)
+        
+    # --- CRITICAL: Save target scaler ---
+    with open(f"{save_dir}/target_scaler.pkl", 'wb') as f:
+        pickle.dump(target_scaler, f)
     
-    print(f"\nModel saved to: {save_dir}")
-    print("\nPIPELINE COMPLETED SUCCESSFULLY")
+    print(f"\nModel and scalers saved to: {save_dir}")
+    print("\n" + "="*60)
+    print("PIPELINE COMPLETED SUCCESSFULLY")
+    print("="*60)
     
     return model, results, history
 

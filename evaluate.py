@@ -1,136 +1,92 @@
 """
-Model evaluation and prediction display
+Model evaluation for regression
 """
 
 import numpy as np
-from sklearn.metrics import classification_report, accuracy_score, confusion_matrix
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 
 
-def predict_and_evaluate(model, X_test, y_test, horizons):
+def predict_and_evaluate(model, X_test, y_test_norm, horizons, target_scaler):
     """
-    Make predictions and calculate metrics
+    Make predictions and calculate regression metrics
+    
+    Args:
+        model: Trained Keras model
+        X_test: Test features (normalized)
+        y_test_norm: Test targets (normalized)
+        horizons: List of prediction horizons
+        target_scaler: The fitted scaler for targets
+    
+    Returns:
+        results: Dictionary with predictions and metrics
     """
     print("\n" + "="*60)
-    print("MODEL EVALUATION")
+    print("MODEL EVALUATION (REGRESSION)")
     print("="*60)
     
-    # Make predictions
+    # Make predictions (normalized)
     print("\nGenerating predictions...")
-    # predictions_proba shape is (batch_size, n_horizons, 3_classes)
-    predictions_proba = model.predict(X_test, verbose=0)
+    y_pred_norm = model.predict(X_test, verbose=0)
+    
+    # --- CRITICAL: Inverse transform to get real values ---
+    y_pred_real = target_scaler.inverse_transform(y_pred_norm)
+    y_true_real = target_scaler.inverse_transform(y_test_norm)
     
     results = {}
     
     for i, h in enumerate(horizons):
-        # Extract predictions for this specific horizon
-        y_pred_proba_horizon = predictions_proba[:, i, :] # Shape: (batch, 3)
-        y_pred = np.argmax(y_pred_proba_horizon, axis=1)  # Shape: (batch,)
-        y_true = y_test[:, i].astype(int)                 # Shape: (batch,)
+        # Extract real values for this horizon
+        y_true_h = y_true_real[:, i]
+        y_pred_h = y_pred_real[:, i]
         
-        # Calculate confidence (max probability)
-        confidence = np.max(y_pred_proba_horizon, axis=1)
-        
-        # Overall accuracy
-        accuracy = accuracy_score(y_true, y_pred)
-        
-        # High confidence accuracy
-        high_conf_threshold = 0.6
-        high_conf_mask = confidence > high_conf_threshold
-        if high_conf_mask.sum() > 0:
-            high_conf_acc = accuracy_score(y_true[high_conf_mask], y_pred[high_conf_mask])
-            high_conf_count = high_conf_mask.sum()
-        else:
-            high_conf_acc = 0.0
-            high_conf_count = 0
+        # Calculate metrics
+        r2 = r2_score(y_true_h, y_pred_h)
+        mae = mean_absolute_error(y_true_h, y_pred_h)
+        mse = mean_squared_error(y_true_h, y_pred_h)
         
         # Store results
         results[h] = {
-            'y_true': y_true,
-            'y_pred': y_pred,
-            'y_pred_proba': y_pred_proba_horizon,
-            'confidence': confidence,
-            'accuracy': accuracy,
-            'high_conf_accuracy': high_conf_acc,
-            'high_conf_count': high_conf_count,
-            'avg_confidence': confidence.mean()
+            'y_true': y_true_h,
+            'y_pred': y_pred_h,
+            'r2_score': r2,
+            'mae': mae,
+            'mse': mse
         }
         
         # Display metrics
         print(f"\n{h}-day predictions:")
-        print(f"  Overall accuracy: {accuracy:.2%}")
-        print(f"  High confidence accuracy (>{high_conf_threshold:.0%}): {high_conf_acc:.2%}")
-        print(f"  High confidence samples: {high_conf_count} / {len(y_test)} ({high_conf_count/len(y_test):.1%})")
-        
-        # Detailed classification report
-        print(f"\n  Classification Report (0=Down, 1=Neutral, 2=Up):")
-        print(classification_report(
-            y_true, y_pred,
-            target_names=['Strong Down', 'Neutral', 'Strong Up'],
-            zero_division=0,
-            digits=3
-        ))
-        
-        # Confusion matrix
-        cm = confusion_matrix(y_true, y_pred)
-        print(f"  Confusion Matrix:")
-        print(f"  {cm}")
+        print(f"  R-squared (R²): {r2:.3f}")
+        print(f"  Mean Absolute Error (MAE): {mae:.2%}")
+        print(f"  (Le modèle se trompe en moyenne de +/- {mae:.2%})")
+        print(f"  Root Mean Squared Error (RMSE): {np.sqrt(mse):.2%}")
     
     return results
 
 
 def show_sample_predictions(results, horizons, n_samples=10):
     """
-    Display sample predictions
+    Display sample predictions (real values)
+    
+    Args:
+        results: Results dictionary from predict_and_evaluate
+        horizons: List of prediction horizons
+        n_samples: Number of samples to show
     """
     print("\n" + "="*60)
     print(f"SAMPLE PREDICTIONS (last {n_samples})")
     print("="*60)
     
-    class_names = ['STRONG DOWN', 'NEUTRAL', 'STRONG UP']
-    
     for h in horizons:
         r = results[h]
         
-        print(f"\n{h}-day predictions:")
-        print(f"{'True':<15} {'Predicted':<15} {'Confidence':<12} {'Correct':<10}")
-        print("-" * 55)
+        print(f"\n{h}-day predictions (% change in volume):")
+        print(f"{'True Value':<15} {'Predicted Value':<15} {'Error':<10}")
+        print("-" * 45)
         
         # Iterate from the end of the dataset
         for i in range(-n_samples, 0):
-            true_class = class_names[r['y_true'][i]]
-            pred_class = class_names[r['y_pred'][i]]
-            conf = r['confidence'][i]
-            correct = "✓" if r['y_true'][i] == r['y_pred'][i] else "✗"
+            true_val = r['y_true'][i]
+            pred_val = r['y_pred'][i]
+            error = true_val - pred_val
             
-            print(f"{true_class:<15} {pred_class:<15} {conf:.1%}         {correct}")
-
-
-def analyze_by_confidence(results, horizons):
-    """
-    Analyze accuracy by confidence level
-    """
-    print("\n" + "="*60)
-    print("ACCURACY BY CONFIDENCE LEVEL")
-    print("="*60)
-    
-    confidence_thresholds = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-    
-    for h in horizons:
-        r = results[h]
-        
-        print(f"\n{h}-day predictions:")
-        print(f"{'Confidence >':<15} {'Count (% total)':<20} {'Accuracy':<12}")
-        print("-" * 50)
-        
-        for threshold in confidence_thresholds:
-            mask = r['confidence'] > threshold
-            count = mask.sum()
-            if count > 0:
-                acc = accuracy_score(r['y_true'][mask], r['y_pred'][mask])
-                pct = count / len(r['y_true']) * 100
-                print(f"{threshold:<15.1f} {count:<8} ({pct:>5.1f}%)       {acc:.2%}")
-            else:
-                print(f"{threshold:<15.1f} 0        (  0.0%)       N/A")
-
-if __name__ == "__main__":
-    print("Evaluation module - Use with main.py")
+            print(f"{true_val:>+14.2%} {pred_val:>+16.2%} {error:>+9.2%}")

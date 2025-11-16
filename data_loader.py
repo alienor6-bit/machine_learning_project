@@ -1,5 +1,5 @@
 """
-Data loading and feature engineering for Bitcoin prediction
+Data loading and feature engineering
 """
 
 import pandas as pd
@@ -29,103 +29,73 @@ def add_technical_features(df):
     """
     data = pd.DataFrame(index=df.index)
     
-    # Basic price features
+    # --- Features from Price ---
     data['close'] = df['Close']
     data['high'] = df['High']
     data['low'] = df['Low']
-    data['volume'] = df['Volume']
-    
-    # Returns (multiple timeframes)
     data['return_1d'] = df['Close'].pct_change(1)
     data['return_3d'] = df['Close'].pct_change(3)
     data['return_7d'] = df['Close'].pct_change(7)
-    
-    # Volatility
     data['volatility_7d'] = data['return_1d'].rolling(7).std()
     data['volatility_30d'] = data['return_1d'].rolling(30).std()
     
-    # Volume features
-    data['volume_change'] = df['Volume'].pct_change()
-    data['volume_ratio'] = df['Volume'] / df['Volume'].rolling(20).mean()
-    
-    # Moving averages
+    # SMA
     sma_10 = SMAIndicator(df['Close'], 10).sma_indicator()
     sma_20 = SMAIndicator(df['Close'], 20).sma_indicator()
     sma_50 = SMAIndicator(df['Close'], 50).sma_indicator()
-    sma_200 = SMAIndicator(df['Close'], 200).sma_indicator()
-    
-    data['sma_10'] = sma_10
-    data['sma_20'] = sma_20
-    data['sma_50'] = sma_50
-    data['sma_200'] = sma_200
-    
-    # Price relative to moving averages
     data['price_vs_sma10'] = (df['Close'] - sma_10) / sma_10
     data['price_vs_sma20'] = (df['Close'] - sma_20) / sma_20
     data['price_vs_sma50'] = (df['Close'] - sma_50) / sma_50
     
-    # RSI (Relative Strength Index)
-    data['rsi_7'] = RSIIndicator(df['Close'], 7).rsi()
+    # RSI
     data['rsi_14'] = RSIIndicator(df['Close'], 14).rsi()
-    data['rsi_21'] = RSIIndicator(df['Close'], 21).rsi()
     
     # MACD
     macd = MACD(df['Close'])
-    data['macd'] = macd.macd()
-    data['macd_signal'] = macd.macd_signal()
     data['macd_diff'] = macd.macd_diff()
     
     # Bollinger Bands
     bb = BollingerBands(df['Close'], 20)
-    data['bb_upper'] = bb.bollinger_hband()
-    data['bb_lower'] = bb.bollinger_lband()
-    data['bb_middle'] = bb.bollinger_mavg()
-    data['bb_position'] = (df['Close'] - data['bb_lower']) / (data['bb_upper'] - data['bb_lower'])
-    data['bb_width'] = (data['bb_upper'] - data['bb_lower']) / data['bb_middle']
+    data['bb_position'] = (df['Close'] - bb.bollinger_lband()) / (bb.bollinger_hband() - bb.bollinger_lband())
+    data['bb_width'] = bb.bollinger_wband()
     
     # Price range
     data['high_low_range'] = (df['High'] - df['Low']) / df['Close']
+    
+    # --- Features from Volume ---
+    data['volume'] = df['Volume']
+    data['volume_change'] = df['Volume'].pct_change()
+    data['volume_ratio'] = df['Volume'] / df['Volume'].rolling(20).mean()
     
     print(f"Added {len(data.columns)} technical features")
     return data
 
 
-def create_classification_targets(df, horizons=[1, 3, 7, 14], percentile=33.3):
+def create_regression_targets(df, horizons=[1, 3, 7, 14]):
     """
-    Create classification targets (0=Down, 1=Neutral, 2=Up)
+    Create regression targets (future % volume change)
     """
-    print(f"\nCreating classification targets using {percentile:.1f}th percentile")
+    print(f"\nCreating regression targets for horizons: {horizons}")
     targets = pd.DataFrame(index=df.index)
     
+    # Use a rolling average of volume to smooth it out
+    vol_avg = df['Volume'].rolling(5).mean()
+    
     for h in horizons:
-        future_return = df['Close'].shift(-h) / df['Close'] - 1
+        # Future average volume
+        future_vol_avg = vol_avg.shift(-h)
         
-        # Determine thresholds
-        abs_returns = future_return.abs()
+        # Target: % change in future avg volume vs current avg volume
+        targets[f'target_{h}d'] = (future_vol_avg - vol_avg) / vol_avg
         
-        # We need two thresholds for 3 classes
-        thresh_low = abs_returns.quantile(percentile / 100)
-        # This is not quite right for 33/33/33. Let's fix this logic.
-        
-        # NEW LOGIC for 33/33/33 split:
-        thresh_down = future_return.quantile(percentile / 100) # e.g., 33.3rd percentile
-        thresh_up = future_return.quantile(1 - (percentile / 100)) # e.g., 66.7th percentile
-        
-        # 0: Down, 1: Neutral, 2: Up
-        targets[f'target_{h}d'] = 1
-        targets.loc[future_return > thresh_up, f'target_{h}d'] = 2
-        targets.loc[future_return < thresh_down, f'target_{h}d'] = 0
-        
-        # Show distribution
-        counts = targets[f'target_{h}d'].value_counts().sort_index()
-        total = len(targets[f'target_{h}d'].dropna())
-        dist = {k: counts.get(k, 0) / total * 100 for k in [0, 1, 2]}
-        print(f"  {h}d (Thresh: {thresh_down:.2%} / {thresh_up:.2%}) - Down: {dist[0]:.1f}%, Neut: {dist[1]:.1f}%, Up: {dist[2]:.1f}%")
-
+        # Show stats
+        print(f"  {h}d - Avg Change: {targets[f'target_{h}d'].mean():.2%}, "
+              f"Std: {targets[f'target_{h}d'].std():.2%}")
+    
     return targets
 
 
-def prepare_dataset(start_date='2018-01-01', horizons=[1, 3, 7, 14], percentile=33.3):
+def prepare_dataset(start_date='2018-01-01', horizons=[1, 3, 7, 14]):
     """
     Main function to prepare complete dataset
     """
@@ -135,19 +105,15 @@ def prepare_dataset(start_date='2018-01-01', horizons=[1, 3, 7, 14], percentile=
     
     raw_data = download_bitcoin(start_date)
     features = add_technical_features(raw_data)
-    targets = create_classification_targets(raw_data, horizons, percentile)
+    
+    # Call the new regression target function
+    targets = create_regression_targets(raw_data, horizons)
     
     dataset = pd.concat([features, targets], axis=1)
     
-    # Remove NaN rows (from TAs and future targets)
     initial_rows = len(dataset)
     dataset = dataset.dropna()
     print(f"\nRemoved {initial_rows - len(dataset)} NaN rows")
     print(f"Final dataset rows: {len(dataset)}")
     
     return dataset, horizons
-
-
-if __name__ == "__main__":
-    dataset, horizons = prepare_dataset()
-    print(f"\nDataset shape: {dataset.shape}")

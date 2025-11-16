@@ -2,12 +2,10 @@
 Model training functions
 """
 
-# --- SIGNATURE DE FONCTION CORRECTE ---
-# Elle attend X_val et y_val, pas 'validation_data'
 def train_model(model, X_train, y_train, X_val, y_val, 
                 epochs=100, batch_size=32, callbacks=None):
     """
-    Train the LSTM classifier
+    Train the LSTM regressor
     """
     print("\n" + "="*60)
     print("TRAINING MODEL")
@@ -20,11 +18,11 @@ def train_model(model, X_train, y_train, X_val, y_val,
     history = model.fit(
         X_train,
         y_train,
-        validation_data=(X_val, y_val), # <-- On crée le tuple ici
+        validation_data=(X_val, y_val),
         epochs=epochs,
         batch_size=batch_size,
         callbacks=callbacks,
-        # Pas de sample_weight
+        shuffle=False,
         verbose=1
     )
     
@@ -35,13 +33,13 @@ def train_model(model, X_train, y_train, X_val, y_val,
 
 def display_training_results(history):
     """
-    Display training results summary
+    Display training results summary for regression
     """
     print("\n" + "="*60)
     print("TRAINING SUMMARY")
     print("="*60)
     
-    # Find best epoch based on val_loss
+    # Find best epoch based on val_loss (val_mse)
     best_epoch = min(range(len(history.history['val_loss'])), 
                     key=lambda i: history.history['val_loss'][i])
     
@@ -49,15 +47,11 @@ def display_training_results(history):
     
     # Get metrics from the best epoch
     best_val_loss = history.history['val_loss'][best_epoch]
-    best_val_acc = history.history['val_accuracy'][best_epoch]
+    best_val_mae = history.history['val_mae'][best_epoch]
     train_loss = history.history['loss'][best_epoch]
-    train_acc = history.history['accuracy'][best_epoch]
+    train_mae = history.history['mae'][best_epoch]
 
-    print(f"  Training loss: {train_loss:.4f}")
-    print(f"  Training accuracy: {train_acc:.4f}")
-    print(f"  Validation loss: {best_val_loss:.4f}")
-    print(f"  Validation accuracy: {best_val_acc:.4f}")
-
-
-if __name__ == "__main__":
-    print("Training module - Use with main.py")
+    print(f"  Training Loss (MSE): {train_loss:.4f}")
+    print(f"  Training MAE: {train_mae:.4f}")
+    print(f"  Validation Loss (MSE): {best_val_loss:.4f}")
+    print(f"  Validation MAE: {best_val_mae:.4f}")
