@@ -1,93 +1,96 @@
-"""
-LSTM model architecture for regression
-"""
-
+import tensorflow as tf
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.regularizers import l2
-import tensorflow as tf # Importé pour la métrique MAE
 
-
-def build_regressor(input_shape, n_horizons, units=64, dropout=0.4):
+# ==================================================================================
+# 5. MODEL ARCHITECTURE (LSTM)
+# ==================================================================================
+def build_classifier(input_shape, n_horizons, units=64, dropout=0.3):
     """
-    Build LSTM regressor for multi-horizon prediction
-    """
-    print("\nBuilding LSTM Regressor...")
-    print(f"  Input shape: {input_shape}")
-    print(f"  LSTM units: {units}")
-    print(f"  Dropout: {dropout}")
-
-    l2_reg = 0.001
-
-    model = Sequential([
-        # Input layer
-        LSTM(
-            units, 
-            return_sequences=True, 
-            input_shape=input_shape,
-            kernel_regularizer=l2(l2_reg)
-        ),
-        Dropout(dropout),
-        BatchNormalization(),
-        
-        # Hidden layer
-        LSTM(
-            units // 2,
-            kernel_regularizer=l2(l2_reg)
-        ),
-        Dropout(dropout),
-        
-        # Dense layer
-        Dense(32, activation='relu', kernel_regularizer=l2(l2_reg)),
-        Dropout(dropout),
-        
-        # --- CRITICAL CHANGE: Output layer ---
-        # No Reshape, No Softmax
-        # Just one 'linear' output node per horizon
-        Dense(n_horizons, activation='linear')
-    ])
+    Builds a Bidirectional LSTM model for time series classification.
     
+    Architecture:
+    1. Bidirectional LSTM Layer: Captures patterns from past to future and vice versa.
+    2. BatchNormalization: Stabilizes learning.
+    3. Dropout: Prevents overfitting by randomly turning off neurons.
+    4. Dense Layers: Final classification decision.
+    """
+    model = Sequential([
+        # LSTM Layer
+        # return_sequences=False because we only want the output of the LAST timestep
+        tf.keras.layers.Bidirectional(LSTM(
+            units, 
+            input_shape=input_shape, 
+            return_sequences=False,
+            kernel_regularizer=l2(0.001) # L2 Regularization to prevent overfitting
+        )),
+        BatchNormalization(),
+        Dropout(dropout),
+        
+        # Dense Layer (Hidden)
+        Dense(units // 2, activation='relu', kernel_regularizer=l2(0.001)),
+        BatchNormalization(),
+        Dropout(dropout),
+        
+        # Output Layer
+        # Sigmoid activation outputs a probability between 0 and 1
+        Dense(n_horizons, activation='sigmoid')
+    ])
     return model
 
-
-def compile_model(model, learning_rate=0.0001):
+def compile_model(model, learning_rate=0.001):
     """
-    Compile model with optimizer and loss for regression
+    Compiles the model with Optimizer and Loss Function.
     """
-    optimizer = Adam(learning_rate=learning_rate)
+    optimizer = Adam(learning_rate=learning_rate, clipnorm=1.0) # clipnorm prevents exploding gradients
     
     model.compile(
         optimizer=optimizer,
-        loss='mean_squared_error', # <-- MSE for regression
-        metrics=[tf.keras.metrics.MeanAbsoluteError(name='mae')] # <-- MAE is more interpretable
+        loss='binary_crossentropy', # Standard loss for binary classification
+        metrics=['accuracy']
     )
-    
-    print(f"\nModel compiled with loss=MSE, metric=MAE, lr={learning_rate}")
     return model
 
-
-def get_callbacks(patience=20, min_delta=0.0001):
+def get_callbacks(patience=20):
     """
-    Get training callbacks
-    (monitoring val_loss, which is val_mse)
+    Callbacks to optimize training:
+    1. EarlyStopping: Stop training if validation loss stops improving.
+    2. ReduceLROnPlateau: Lower learning rate if stuck in a local minimum.
     """
-    callbacks = [
-        EarlyStopping(
-            monitor='val_loss',
-            patience=patience,
-            restore_best_weights=True,
-            verbose=1,
-            min_delta=min_delta
-        ),
-        ReduceLROnPlateau(
-            monitor='val_loss',
-            factor=0.5,
-            patience=patience // 2,
-            min_lr=1e-7,
-            verbose=1
-        )
-    ]
+    early_stopping = EarlyStopping(
+        monitor='val_loss',
+        patience=patience,
+        restore_best_weights=True,
+        verbose=1
+    )
     
-    return callbacks
+    reduce_lr = ReduceLROnPlateau(
+        monitor='val_loss',
+        factor=0.5,
+        patience=patience // 2,
+        min_lr=1e-6,
+        verbose=1
+    )
+    
+    return [early_stopping, reduce_lr]
+
+def train_model(model, X_train, y_train, X_val, y_val, epochs=50, batch_size=32, callbacks=None, class_weight=None):
+    """
+    Executes the training loop.
+    """
+    print(f"Training model on {len(X_train)} samples...")
+    
+    history = model.fit(
+        X_train, y_train,
+        validation_data=(X_val, y_val),
+        epochs=epochs,
+        batch_size=batch_size,
+        callbacks=callbacks,
+        shuffle=True, # Shuffle batches to break correlation
+        verbose=1,
+        class_weight=class_weight
+    )
+    return history
