@@ -134,6 +134,7 @@ def main():
         dropout=0.2
     )
     model = compile_model(model, learning_rate=0.001)
+    model.build(input_shape=(None, X_train_norm.shape[1], X_train_norm.shape[2]))
 
     print("\nModel Architecture:")
     model.summary()
