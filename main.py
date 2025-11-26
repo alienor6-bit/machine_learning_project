@@ -251,13 +251,13 @@ def main():
 
         results_dir = save_results(model, sequences_data, history, metrics, timestamp)
 
-        print("\n🎉 PIPELINE TERMINÉ AVEC SUCCÈS!")
-        print(f"📊 Résultats disponibles dans: {results_dir}")
+        print("\n PIPELINE TERMINÉ AVEC SUCCÈS!")
+        print(f" Résultats disponibles dans: {results_dir}")
 
         return model, sequences_data, history, metrics
 
     except Exception as e:
-        print(f"\n❌ ERREUR: {str(e)}")
+        print(f"\n ERREUR: {str(e)}")
         import traceback
         traceback.print_exc()
         return None, None, None, None
