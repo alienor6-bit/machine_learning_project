@@ -51,47 +51,47 @@ def get_forex_data(pair="EURUSD=X", start="2015-01-01", end="2025-01-01"):
 
                 # Apply mapping
                 data = data.rename(columns=column_mapping)
-                print(f"  📋 Standardized columns: {list(data.columns)}")
+                print(f" Standardized columns: {list(data.columns)}")
 
                 # VERIFY WE HAVE ESSENTIAL DATA
                 essential_cols = ['Open', 'High', 'Low', 'Close']
                 available_essential = [col for col in essential_cols if col in data.columns]
 
                 if len(available_essential) >= 1:  # At least Close price
-                    print(f"  ✅ Found essential data: {available_essential}")
+                    print(f" Found essential data: {available_essential}")
 
                     # Fill missing OHLC with Close if needed (common for some forex feeds)
                     if 'Close' in data.columns:
                         for col in ['Open', 'High', 'Low']:
                             if col not in data.columns:
-                                print(f"  📝 Creating missing {col} from Close price")
+                                print(f"Creating missing {col} from Close price")
                                 data[col] = data['Close']
 
                     # Ensure Volume column exists (forex volume is often not meaningful)
                     if 'Volume' not in data.columns:
-                        print("  📝 Adding dummy Volume column")
+                        print(" Adding dummy Volume column")
                         data['Volume'] = 0
 
                     # Remove any completely empty rows
                     data = data.dropna(how='all')
 
                     if len(data) > 0:
-                        print(f"  ✅ Final data: {data.shape}")
-                        print(f"  📅 Date range: {data.index[0]} to {data.index[-1]}")
-                        print(f"  📊 Sample data:")
+                        print(f"  Final data: {data.shape}")
+                        print(f"  Date range: {data.index[0]} to {data.index[-1]}")
+                        print(f"  Sample data:")
                         print(data[['Open', 'High', 'Low', 'Close']].head(2))
                         return data
                     else:
-                        print(f"  ❌ No data remaining after cleaning")
+                        print(f" No data remaining after cleaning")
                 else:
-                    print(f"  ❌ No essential price data found")
+                    print(f" No essential price data found")
 
         except Exception as e:
-            print(f"  ❌ Error with {symbol}: {str(e)[:100]}...")
+            print(f"  Error with {symbol}: {str(e)[:100]}...")
             continue
 
     # If all symbols fail, create sample data for testing
-    print(f"\n⚠️  Could not download real data - creating sample forex data for testing...")
+    print(f"\n  Could not download real data - creating sample forex data for testing...")
     return create_sample_forex_data(start, end)
 
 def create_sample_forex_data(start="2015-01-01", end="2025-01-01"):
@@ -163,9 +163,9 @@ def create_sample_forex_data(start="2015-01-01", end="2025-01-01"):
     # Remove weekends (forex markets are 24/5)
     sample_data = sample_data[sample_data.index.dayofweek < 5]
 
-    print(f"✅ Created sample data: {sample_data.shape}")
-    print(f"📅 Date range: {sample_data.index[0]} to {sample_data.index[-1]}")
-    print(f"💱 Price range: {sample_data['Close'].min():.4f} - {sample_data['Close'].max():.4f}")
+    print(f" Created sample data: {sample_data.shape}")
+    print(f" Date range: {sample_data.index[0]} to {sample_data.index[-1]}")
+    print(f" Price range: {sample_data['Close'].min():.4f} - {sample_data['Close'].max():.4f}")
 
     return sample_data
 
@@ -177,7 +177,7 @@ def add_forex_indicators(df):
 
     # Ensure we have minimum required data
     if len(df) < 250:  # Need ~1 year for 200-day MA
-        print(f"⚠️  Warning: Only {len(df)} days of data. Some indicators may not be reliable.")
+        print(f"  Warning: Only {len(df)} days of data. Some indicators may not be reliable.")
 
     # Clean data
     required_cols = ['Open', 'High', 'Low', 'Close']
@@ -186,7 +186,7 @@ def add_forex_indicators(df):
     if len(df_clean) == 0:
         raise ValueError("No valid OHLC data after cleaning")
 
-    print(f"✅ Using {len(df_clean)} clean data points")
+    print(f" Using {len(df_clean)} clean data points")
 
     indicators = pd.DataFrame(index=df_clean.index)
 
@@ -260,7 +260,7 @@ def add_forex_indicators(df):
     indicators['Body_Size'] = abs(df_clean['Close'] - df_clean['Open']) / (df_clean['Close'] + eps)
     indicators['Is_Bullish'] = (df_clean['Close'] > df_clean['Open']).astype(int)
 
-    print(f"✅ Created {len(indicators.columns)} forex indicators")
+    print(f"Created {len(indicators.columns)} forex indicators")
     return indicators
 
 def create_forex_targets(df, horizons=[1, 5, 10]):
@@ -287,7 +287,7 @@ def create_forex_targets(df, horizons=[1, 5, 10]):
             targets[f'Target_Max_Return_{horizon}d'] = (future_high - df['Close']) / df['Close']
             targets[f'Target_Min_Return_{horizon}d'] = (future_low - df['Close']) / df['Close']
 
-    print(f"✅ Created {len(targets.columns)} target variables")
+    print(f"Created {len(targets.columns)} target variables")
     return targets
 
 def prepare_forex_dataset():
@@ -300,57 +300,57 @@ def prepare_forex_dataset():
 
     try:
         # Step 1: Get forex data
-        print("\n📊 Step 1: Downloading forex data...")
+        print("\n Step 1: Downloading forex data...")
         raw_data = get_forex_data()
 
         # Step 2: Create indicators
-        print("\n📈 Step 2: Creating technical indicators...")
+        print("\n Step 2: Creating technical indicators...")
         indicators = add_forex_indicators(raw_data)
 
         # Step 3: Create targets
-        print("\n🎯 Step 3: Creating target variables...")
+        print("\n Step 3: Creating target variables...")
         targets = create_forex_targets(raw_data)
 
         # Step 4: Combine data
-        print("\n🔄 Step 4: Combining data...")
+        print("\n Step 4: Combining data...")
         complete_dataset = pd.concat([indicators, targets], axis=1)
 
         # Step 5: Final cleaning
-        print("\n🧹 Step 5: Final cleaning...")
+        print("\n Step 5: Final cleaning...")
         initial_rows = len(complete_dataset)
         complete_dataset = complete_dataset.dropna()
         final_rows = len(complete_dataset)
 
-        print(f"✅ Removed {initial_rows - final_rows} rows with NaN")
-        print(f"✅ Final dataset: {complete_dataset.shape}")
-        print(f"📅 Date range: {complete_dataset.index[0]} to {complete_dataset.index[-1]}")
+        print(f" Removed {initial_rows - final_rows} rows with NaN")
+        print(f" Final dataset: {complete_dataset.shape}")
+        print(f" Date range: {complete_dataset.index[0]} to {complete_dataset.index[-1]}")
 
         # Show breakdown
         feature_cols = [col for col in complete_dataset.columns if not col.startswith('Target_')]
         target_cols = [col for col in complete_dataset.columns if col.startswith('Target_')]
 
-        print(f"\n📋 Dataset composition:")
+        print(f"\n Dataset composition:")
         print(f"   Features: {len(feature_cols)}")
         print(f"   Targets: {len(target_cols)}")
 
         return complete_dataset
 
     except Exception as e:
-        print(f"❌ Error in prepare_forex_dataset: {e}")
+        print(f" Error in prepare_forex_dataset: {e}")
         raise
 
 if __name__ == "__main__":
     try:
         dataset = prepare_forex_dataset()
-        print(f"\n🎉 SUCCESS! Forex dataset ready with {dataset.shape[0]} rows and {dataset.shape[1]} columns")
+        print(f"\n SUCCESS! Forex dataset ready with {dataset.shape[0]} rows and {dataset.shape[1]} columns")
 
         # Show sample
-        print("\n📊 Sample data:")
+        print("\n Sample data:")
         sample_cols = ['Close', 'RSI_14', 'MACD', 'Target_Return_1d', 'Target_Return_5d']
         available_cols = [col for col in sample_cols if col in dataset.columns]
         print(dataset[available_cols].tail())
 
     except Exception as e:
-        print(f"❌ Failed: {e}")
+        print(f" Failed: {e}")
         import traceback
         traceback.print_exc()
