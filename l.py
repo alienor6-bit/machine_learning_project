@@ -221,11 +221,11 @@ def improved_forex_pipeline():
     # model = build_improved_forex_lstm(input_shape, n_outputs)
     # optimizer, callbacks = get_improved_training_config()
 
-    print("✅ Improved forex pipeline ready")
+    print(" Improved forex pipeline ready")
     return dataset
 
 if __name__ == "__main__":
-    print("🚀 Forex Model Improvements")
+    print(" Forex Model Improvements")
     print("=" * 50)
     print("1. Enhanced LSTM architecture with regularization")
     print("2. Better feature selection (remove noise)")
@@ -237,6 +237,6 @@ if __name__ == "__main__":
     # Test improvements
     try:
         dataset = improved_forex_pipeline()
-        print(f"\n✅ Improved dataset ready: {dataset.shape}")
+        print(f"\n Improved dataset ready: {dataset.shape}")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")
