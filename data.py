@@ -1,12 +1,11 @@
 import pandas as pd
 import yfinance as yf
 import numpy as np
-from ta.momentum import RSIIndicator, StochasticOscillator
-from ta.trend import MACD, SMAIndicator, EMAIndicator, ADXIndicator
+from ta.momentum import RSIIndicator
+from ta.trend import MACD, SMAIndicator
 from ta.volatility import BollingerBands, AverageTrueRange
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from sklearn.feature_selection import SelectKBest, mutual_info_classif
 
 # ==================================================================================
 # 1. DATA LOADING

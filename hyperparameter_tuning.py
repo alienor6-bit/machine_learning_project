@@ -21,7 +21,7 @@ def test_configuration(config, X_train, y_train, X_val, y_val, X_test, y_test, r
     print(f"\n{'='*60}")
     print(f"Testing Config: {config}")
     print(f"{'='*60}")
-    
+
     # 1. Build Model
     model = build_classifier(
         input_shape=(X_train.shape[1], X_train.shape[2]),
@@ -29,9 +29,9 @@ def test_configuration(config, X_train, y_train, X_val, y_val, X_test, y_test, r
         units=config['units'],
         dropout=config['dropout']
     )
-    
+
     model = compile_model(model, learning_rate=config['learning_rate'])
-    
+
     # 2. Train
     history = train_model(
         model, X_train, y_train, X_val, y_val,
@@ -39,18 +39,18 @@ def test_configuration(config, X_train, y_train, X_val, y_val, X_test, y_test, r
         batch_size=config['batch_size'],
         callbacks=get_callbacks(patience=config['patience'])
     )
-    
+
     # 3. Evaluate
     results = predict_and_evaluate(
         model, X_test, y_test, horizons, returns_test,
         confidence_threshold=config['confidence_threshold']
     )
-    
+
     # 4. Backtest Performance
     r = results[5]
     y_pred = r['y_pred']
     real_returns = np.nan_to_num(r['returns'], nan=0.0)
-    
+
     capital = 1000.0
     for i in range(len(y_pred)):
         ret = real_returns[i]
@@ -58,13 +58,13 @@ def test_configuration(config, X_train, y_train, X_val, y_val, X_test, y_test, r
             capital *= (1 + ret - 0.0002)
         else:
             pass # Cash
-    
+
     ai_return = (capital - 1000) / 1000
-    
+
     # Get Validation Accuracy (to check for overfitting)
     best_epoch = np.argmin(history.history['val_loss'])
     val_acc = history.history['val_accuracy'][best_epoch]
-    
+
     return {
         'config': config,
         'val_acc': val_acc,
@@ -80,61 +80,88 @@ def run_hyperparameter_search():
     print("="*60)
     print("HYPERPARAMETER TUNING")
     print("="*60)
-    
+
     # Prepare data once
     tf.keras.utils.set_random_seed(42)
     np.random.seed(42)
-    
+
     HORIZONS = [1, 5]
     dataset = prepare_dataset(start_date='2000-01-01', horizons=HORIZONS)
     X, y, _ = create_sequences(dataset, HORIZONS, window_size=60)
-    
+
     returns_cols = [f'real_return_{h}d' for h in HORIZONS]
     returns_aligned = dataset[returns_cols].values[60:]
-    
+
     X_train, X_val, X_test, y_train, y_val, y_test = split_temporal(X, y, test_size=0.2, val_size=0.1)
     test_idx = int(len(X) * 0.8)
     returns_test = returns_aligned[test_idx:]
-    
+
     X_train_norm, X_val_norm, X_test_norm, scaler = normalize_features(X_train, X_val, X_test)
-    
+
     # Define configurations to test
     configs = [
-        # Baseline
-        {
-            'name': 'Baseline',
-            'units': 24,
-            'dropout': 0.2,
-            'learning_rate': 0.001,
-            'batch_size': 32,
-            'epochs': 50,
-            'patience': 15,
-            'confidence_threshold': 0.65
-        },
-        # Deeper network
-        {
-            'name': 'Deeper_Network',
-            'units': 64,
-            'dropout': 0.4,
-            'learning_rate': 0.0005,
-            'batch_size': 32,
-            'epochs': 100,
-            'patience': 20,
-            'confidence_threshold': 0.65
-        },
-        # Higher Learning Rate
-        {
-            'name': 'Higher_LR',
-            'units': 64,
-            'dropout': 0.4,
-            'learning_rate': 0.001,
-            'batch_size': 32,
-            'epochs': 100,
-            'patience': 20,
-            'confidence_threshold': 0.65
-        }
-    ]
-    
+    {
+        'name': 'Baseline',
+        'units': 24,
+        'dropout': 0.2,
+        'learning_rate': 0.001,
+        'batch_size': 32,
+        'epochs': 50,
+        'patience': 15,
+        'confidence_threshold': 0.65
+    },
+    {
+        'name': 'Deeper_Network',
+        'units': 64,
+        'dropout': 0.4,
+        'learning_rate': 0.0005,
+        'batch_size': 32,
+        'epochs': 100,
+        'patience': 20,
+        'confidence_threshold': 0.65
+    },
+    {
+        'name': 'Higher_LR',
+        'units': 64,
+        'dropout': 0.4,
+        'learning_rate': 0.001,
+        'batch_size': 32,
+        'epochs': 100,
+        'patience': 20,
+        'confidence_threshold': 0.65
+    },
+    {
+        'name': 'Large_Network',
+        'units': 128,
+        'dropout': 0.3,
+        'learning_rate': 0.0005,
+        'batch_size': 64,
+        'epochs': 100,
+        'patience': 25,
+        'confidence_threshold': 0.65
+    },
+    {
+        'name': 'High_Regularization',
+        'units': 64,
+        'dropout': 0.5,
+        'learning_rate': 0.001,
+        'batch_size': 32,
+        'epochs': 50,
+        'patience': 20,
+        'confidence_threshold': 0.65
+    },
+    {
+        'name': 'Small_FastTrain',
+        'units': 32,
+        'dropout': 0.2,
+        'learning_rate': 0.002,
+        'batch_size': 64,
+        'epochs': 50,
+        'patience': 10,
+        'confidence_threshold': 0.65
+    }
+]
+
     # Test all configurations
     results_all = []
     for config in configs:
@@ -143,17 +170,17 @@ def run_hyperparameter_search():
             X_test_norm, y_test, returns_test, HORIZONS
         )
         results_all.append(result)
-    
+
     # Display summary
     print("\n" + "="*60)
     print("HYPERPARAMETER TUNING RESULTS")
     print("="*60)
     print(f"{'Config':<20} {'Val Acc':<10} {'Trades':<10} {'AI Return'}")
     print("-"*60)
-    
+
     for r in results_all:
         print(f"{r['config']['name']:<20} {r['val_acc']:>8.2%} {r['test_acc']:>8} {r['ai_return']:>+10.2%}")
-    
+
     # Find best configuration
     best_config = max(results_all, key=lambda x: x['ai_return'])
     print("\n" + "="*60)
