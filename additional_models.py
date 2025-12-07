@@ -43,13 +43,14 @@ def run_logistic_regression(X_train, y_train, X_test, y_test, horizon_index=1):
 
     # Predict
     y_pred = clf.predict(X_test_flat)
+    y_proba = clf.predict_proba(X_test_flat)[:, 1]
     acc = accuracy_score(y_test_h, y_pred)
 
     print(f"Accuracy: {acc:.2%}")
     print("\nClassification Report:")
     print(classification_report(y_test_h, y_pred, target_names=['Down', 'Up']))
 
-    return acc
+    return acc, y_proba, y_test_h
 
 def run_random_forest(X_train, y_train, X_test, y_test, horizon_index=1):
     """
@@ -74,6 +75,7 @@ def run_random_forest(X_train, y_train, X_test, y_test, horizon_index=1):
     clf.fit(X_train_flat, y_train_h)
 
     y_pred = clf.predict(X_test_flat)
+    y_proba = clf.predict_proba(X_test_flat)[:, 1]
     acc = accuracy_score(y_test_h, y_pred)
 
     print(f"Accuracy: {acc:.2%}")
@@ -88,7 +90,7 @@ def run_random_forest(X_train, y_train, X_test, y_test, horizon_index=1):
     for idx in reversed(top_10_idx):
         print(f"  Feature {idx}: {feature_importance[idx]:.4f}")
 
-    return acc, feature_importance
+    return acc, y_proba, y_test_h, feature_importance
 
 def run_xgboost(X_train, y_train, X_test, y_test, horizon_index=1):
     """
@@ -119,13 +121,14 @@ def run_xgboost(X_train, y_train, X_test, y_test, horizon_index=1):
     clf.fit(X_train_flat, y_train_h, verbose=False)
 
     y_pred = clf.predict(X_test_flat)
+    y_proba = clf.predict_proba(X_test_flat)[:, 1]
     acc = accuracy_score(y_test_h, y_pred)
 
     print(f"Accuracy: {acc:.2%}")
     print("\nClassification Report:")
     print(classification_report(y_test_h, y_pred, target_names=['Down', 'Up']))
 
-    return acc
+    return acc, y_proba, y_test_h
 
 # ==================================================================================
 # 2. ENSEMBLE MODEL (VOTING CLASSIFIER)
@@ -176,6 +179,10 @@ def run_ensemble_model(X_train, y_train, X_test, y_test, lstm_model, horizon_ind
     # Evaluate
     acc = accuracy_score(y_test_h, ensemble_pred)
 
+    rf_proba = rf.predict_proba(X_test_flat)[:, 1]
+    xgb_proba = xgb.predict_proba(X_test_flat)[:, 1]
+    ensemble_proba = (rf_proba + xgb_proba + lstm_probs_h) / 3
+
     print(f"Ensemble Accuracy: {acc:.2%}")
     print("\nIndividual Model Accuracies:")
     print(f"  Random Forest: {accuracy_score(y_test_h, rf_pred):.2%}")
@@ -185,7 +192,7 @@ def run_ensemble_model(X_train, y_train, X_test, y_test, lstm_model, horizon_ind
     print("\nClassification Report (Ensemble):")
     print(classification_report(y_test_h, ensemble_pred, target_names=['Down', 'Up']))
 
-    return acc
+    return acc, ensemble_proba, y_test_h
 
 # ==================================================================================
 # 3. MODEL COMPARISON VISUALIZATION

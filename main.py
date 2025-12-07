@@ -99,7 +99,7 @@ def main():
     print("Testing simple models to establish a performance baseline...")
 
     results_comparison = {}
-
+    # Baselines use PCA (2D)
     # Model 1: Logistic Regression
     lr_acc = run_logistic_regression(X_train_pca, y_train, X_test_pca, y_test, horizon_index=1)
     results_comparison['Logistic Regression'] = lr_acc
@@ -118,6 +118,7 @@ def main():
     print("\n" + "="*60)
     print("STEP 5: DEEP LEARNING (BIDIRECTIONAL LSTM)")
     print("="*60)
+    # LSTM uses normalized 3D
 
     model = build_classifier(
         input_shape=(X_train_norm.shape[1], X_train_norm.shape[2]),
