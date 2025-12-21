@@ -1,6 +1,6 @@
 """
 Walk-Forward Validation Script
-==============================
+=============================
 This script implements a rigorous validation method for time series.
 Instead of a single Train/Test split, it uses an "Expanding Window" approach.
 

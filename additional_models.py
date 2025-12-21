@@ -1,6 +1,6 @@
 """
 Additional Models for Comparison
-=================================
+================================
 This module implements simple baseline models to compare against the LSTM.
 According to ML guidelines, we must compare our advanced model (LSTM) 
 with simpler approaches.

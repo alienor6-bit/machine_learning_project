@@ -7,7 +7,7 @@ from tensorflow.keras.regularizers import l2
 
 # ==================================================================================
 # 5. MODEL ARCHITECTURE (LSTM)
-# ==================================================================================
+# =================================================================================
 def build_classifier(input_shape, n_horizons, units=64, dropout=0.3):
     """
     Builds a Bidirectional LSTM model for time series classification.

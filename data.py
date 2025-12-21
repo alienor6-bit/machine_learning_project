@@ -6,7 +6,7 @@ from ta.trend import MACD, SMAIndicator, EMAIndicator, ADXIndicator
 from ta.volatility import BollingerBands, AverageTrueRange
 from sklearn.preprocessing import StandardScaler
 
-# ==================================================================================
+# =================================================================================
 # 1. DATA LOADING
 # ==================================================================================
 def download_data(start_date='2000-01-01', ticker='^FCHI'):

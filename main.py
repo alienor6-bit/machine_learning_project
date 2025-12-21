@@ -20,7 +20,7 @@ def main():
     np.random.seed(42)
     
     print("="*60)
-    print("CAC 40 PREDICTION PROJECT - COMPLETE PIPELINE")
+    print("CAC 40 PREDICTION PROJECT -  COMPLETE PIPELINE")
     print("="*60)
     
     # Configuration
